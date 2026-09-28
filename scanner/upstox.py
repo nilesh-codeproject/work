@@ -89,6 +89,20 @@ def historical_daily(key,years=2):
         df[col]=pd.to_numeric(df[col],errors='coerce')
     return df.sort_values('timestamp').reset_index(drop=True)
 
+def full_market_quotes(instrument_keys):
+    if not instrument_keys:
+        return {}
+    out={}
+    for i in range(0,len(instrument_keys),500):
+        batch=instrument_keys[i:i+500]
+        params=','.join(batch)
+        url=f'{BASE}/v3/market-quote/quotes?instrument_key={params}'
+        payload=_request_json(url,timeout=15,retries=1)
+        for key,value in payload.get('data',{}).items():
+            instrument_key=value.get('instrument_token') or key.replace(':','|',1)
+            out[instrument_key]=value
+    return out
+
 def historical_many(rows,years=2,max_workers=None):
     results={}
     workers=max_workers or settings.UPSTOX_MAX_WORKERS
