@@ -21,18 +21,18 @@ def analyze(symbol,df,nifty_df=None):
         rs20=((price/x.close.iloc[-21]-1)-(nifty_df.close.iloc[-1]/nifty_df.close.iloc[-21]-1))*100
     vcp=detect_vcp(x)
     liquidity=price*last.volume>=settings.MIN_TURNOVER_CR*1e7
-    parts={'trend':above,'near_high':fromhigh<=settings.CANDIDATE_NEAR_HIGH_PCT,'rs':np.isfinite(rs20) and rs20>0,
+    parts={'trend':above,'near_high':fromhigh<=settings.CANDIDATE_NEAR_HIGH_PCT,
            'vcp':vcp['true_vcp'],'swing':swing>=settings.CANDIDATE_MIN_SWING,'liquidity':liquidity,'momentum':momentum}
     score=sum(bool(v) for v in parts.values())
     buy=all([price>=settings.MIN_PRICE,above,momentum,rvol>=settings.MIN_RVOL or pocket,
              normal or vcp['breakout'],atrpct>=settings.MIN_ATR_PCT,swing>=settings.MIN_SWING_RETURN,
-             fromhigh<=settings.MAX_FROM_52W_HIGH,np.isfinite(rs20) and rs20>0,liquidity])
+             fromhigh<=settings.MAX_FROM_52W_HIGH,liquidity])
     failed=[]
     tests=[
       ('price',price>=settings.MIN_PRICE),('ema21',above),('momentum',momentum),
       ('rvol_or_pocket',rvol>=settings.MIN_RVOL or pocket),('breakout_or_vcp',normal or vcp['breakout']),
       ('atr',atrpct>=settings.MIN_ATR_PCT),('swing',swing>=settings.MIN_SWING_RETURN),
-      ('near_52w_high',fromhigh<=settings.MAX_FROM_52W_HIGH),('rs20',np.isfinite(rs20) and rs20>0),
+      ('near_52w_high',fromhigh<=settings.MAX_FROM_52W_HIGH),
       ('turnover',liquidity)]
     failed=[name for name,ok in tests if not ok]
     return {'symbol':symbol,'date':str(last.timestamp),'price':price,'candidate':score>=settings.CANDIDATE_SCORE_REQUIRED,
