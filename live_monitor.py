@@ -121,9 +121,7 @@ def run():
                 if not result:
                     continue
                 symbol = state["symbol"]
-                if result["breakout"] and symbol not in sent_breakout:
-                    sent_breakout.add(symbol)
-                    send(fmt_alert("BREAKOUT", result))
+                # Telegram alerts are restricted to final BUY signals only.
                 if result["buy"] and symbol not in sent_buy:
                     sent_buy.add(symbol)
                     send(fmt_alert("BUY", result))
