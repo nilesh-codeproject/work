@@ -60,12 +60,26 @@ def load_instruments():
     return json.loads(gzip.decompress(r.content))
 
 def load_nse_equities():
-    data=load_instruments()
-    rows=[{'instrument_key':x.get('instrument_key'),'trading_symbol':x.get('trading_symbol')}
-          for x in data if x.get('segment')=='NSE_EQ'
-          and x.get('instrument_type')=='EQ'
-          and x.get('security_type','NORMAL')=='NORMAL']
-    return pd.DataFrame(rows).dropna(subset=['instrument_key']).drop_duplicates('instrument_key').head(settings.MAX_UNIVERSE)
+    # Universe is the union of the requested NSE broad-market indices plus
+    # all NSE IPO listings from 2026-01-01 onward.
+    from scanner.universe import load_requested_universe
+    symbols = load_requested_universe()
+
+    data = load_instruments()
+    instrument_map = {
+        x.get('trading_symbol'): x.get('instrument_key')
+        for x in data
+        if x.get('segment') == 'NSE_EQ'
+        and x.get('instrument_type') == 'EQ'
+        and x.get('security_type', 'NORMAL') == 'NORMAL'
+    }
+
+    rows = [
+        {'instrument_key': instrument_map[s], 'trading_symbol': s}
+        for s in sorted(symbols)
+        if s in instrument_map
+    ]
+    return pd.DataFrame(rows).drop_duplicates('instrument_key').reset_index(drop=True)
 
 def find_nifty500_key():
     data=load_instruments()
