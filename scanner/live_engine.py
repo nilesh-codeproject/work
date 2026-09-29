@@ -62,6 +62,12 @@ def build_state(symbol, df, nifty_df):
         "pivot": pivot,
         "rs20": float(rs20) if np.isfinite(rs20) else np.nan,
         "vcp": vcp["true_vcp"],
+        "original_vcp": vcp["original_vcp"],
+        "optimized_vcp": vcp["optimized_vcp"],
+        "original_vcp_pivot": vcp["original_pivot"],
+        "optimized_vcp_pivot": vcp["pivot"],
+        "original_vcp_breakout": False,
+        "optimized_vcp_breakout": False,
         "vcp_breakout": False,
         "vcp_quality": vcp["quality_score"],
         "vcp_failed": ";".join(vcp["reasons"]),
@@ -96,6 +102,15 @@ def evaluate(state, quote):
         if state["red_max_volume"] > 0 else False
     )
     normal_breakout = price >= state["pivot"]
+    original_vcp_breakout = (
+        state["original_vcp"] and
+        price >= state["original_vcp_pivot"] * (1 + settings.BREAKOUT_BUFFER_PCT / 100)
+    )
+    optimized_vcp_breakout = (
+        state["optimized_vcp"] and
+        price >= state["optimized_vcp_pivot"] * (1 + settings.BREAKOUT_BUFFER_PCT / 100)
+    )
+    vcp_breakout = original_vcp_breakout or optimized_vcp_breakout
     momentum = price > state["prev_close"]
     above_ema = price > state["ema21"]
     liquidity = price * volume >= settings.MIN_TURNOVER_CR * 1e7
@@ -115,7 +130,7 @@ def evaluate(state, quote):
         above_ema,
         momentum,
         projected_rvol >= settings.MIN_RVOL or pocket,
-        normal_breakout or state["vcp_breakout"],
+        normal_breakout or vcp_breakout,
         state["atr_pct"] >= settings.MIN_ATR_PCT,
         state["swing"] >= settings.MIN_SWING_RETURN,
         state["from_high"] <= settings.MAX_FROM_52W_HIGH,
