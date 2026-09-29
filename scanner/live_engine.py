@@ -103,7 +103,6 @@ def evaluate(state, quote):
     parts = {
         "trend": above_ema,
         "near_high": state["from_high"] <= settings.CANDIDATE_NEAR_HIGH_PCT,
-        "rs": np.isfinite(state["rs20"]) and state["rs20"] > 0,
         "vcp": state["vcp"],
         "swing": state["swing"] >= settings.CANDIDATE_MIN_SWING,
         "liquidity": liquidity,
@@ -120,7 +119,6 @@ def evaluate(state, quote):
         state["atr_pct"] >= settings.MIN_ATR_PCT,
         state["swing"] >= settings.MIN_SWING_RETURN,
         state["from_high"] <= settings.MAX_FROM_52W_HIGH,
-        np.isfinite(state["rs20"]) and state["rs20"] > 0,
         liquidity,
     ])
 
