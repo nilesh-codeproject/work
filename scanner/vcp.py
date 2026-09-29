@@ -82,6 +82,7 @@ def detect_vcp(df):
         'original_breakout': bool(original_breakout),
         'optimized_breakout': bool(optimized_breakout),
         'contractions': contractions,
+        'original_pivot': float(original_pivot),
         'pivot': float(bh),
         'tightness': float(tight),
         'volume_ratio': float(vr),
