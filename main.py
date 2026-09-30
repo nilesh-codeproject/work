@@ -43,10 +43,10 @@ def run(limit=None):
                 result['history_bars']=len(df)
                 result['error']=''
                 results.append(result)
+                # Telegram alerts are BUY-only. Candidate results remain in scan_results.csv
+                # for analysis but are not sent as Telegram stock alerts.
                 if result['buy']:
                     send(format_result(result,'BUY'))
-                elif result['candidate']:
-                    send(format_result(result,'CANDIDATE'))
         except Exception as exc:
             status_rows.append({'symbol':symbol,'instrument_key':row.instrument_key,'data_status':'analysis_failed','history_bars':len(df),'error':str(exc)})
             print(f'[{symbol}] analysis failed: {exc}')
