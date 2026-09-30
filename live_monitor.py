@@ -81,11 +81,6 @@ def run():
     if not states:
         raise RuntimeError("No symbols have enough historical data for live monitoring.")
 
-    send(
-        f"🟢 NSE LIVE SCANNER STARTED\n"
-        f"Monitoring {len(states)} symbols via Upstox WebSocket.\n"
-        f"No orders will be placed."
-    )
 
     configuration = upstox_client.Configuration()
     configuration.access_token = settings.UPSTOX_ACCESS_TOKEN
@@ -100,7 +95,6 @@ def run():
 
     def on_open():
         print(f"WebSocket connected; subscribed to {len(keys)} instruments.")
-        send("🟢 Upstox WebSocket connected. Live signal monitoring is active.")
 
     def on_error(message):
         print(f"WebSocket error: {message}")
@@ -154,7 +148,6 @@ def run():
             streamer.disconnect()
         except Exception:
             pass
-        send("🔴 NSE LIVE SCANNER STOPPED for the session.")
 
 if __name__ == "__main__":
     run()
