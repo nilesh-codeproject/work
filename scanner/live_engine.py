@@ -47,6 +47,7 @@ def build_state(symbol, df, nifty_df, market_cap_cr=None):
         "year_low": float(history.low.iloc[-252:].min()),
         "avg_volume": float(history.volume.iloc[-20:].mean()),
         "avg_volume10": float(history.volume.iloc[-10:].mean()),
+        "avg_turnover10_cr": float((history.close.iloc[-10:] * history.volume.iloc[-10:] / 1e7).mean()),
         "dry_up": bool(history.volume.iloc[-3:].mean() < history.volume.iloc[-20:].mean()),
         "red_max_volume": float(red_volume) if pd.notna(red_volume) else 0.0,
         "prev_close": float(previous.close),
@@ -125,13 +126,14 @@ def evaluate(state, quote):
         "volatility": state["is_ipo"] or atr_pct > settings.MIN_ATR_PCT,
         "price_floor": price > settings.MIN_PRICE,
         "market_cap": cap is not None and pd.notna(cap) and cap > 1000,
-        "liquidity": price * volume > settings.MIN_TURNOVER_CR * 1e7,
+        "liquidity": state["avg_turnover10_cr"] >= settings.MIN_TURNOVER_CR,
         "orb": bool(orb_windows),
     }
     return {
         **state,
         "price": price,
         "volume": volume,
+        "avg_turnover10_cr": state["avg_turnover10_cr"],
         "rvol": rvol,
         "atr_pct": atr_pct,
         "from_high": from_high,
