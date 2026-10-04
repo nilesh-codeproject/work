@@ -102,6 +102,11 @@ def run():
     if not states:
         raise RuntimeError("No symbols have completed historical data for live monitoring.")
 
+    send(
+        f"🟢 NSE LIVE SCANNER STARTED\n"
+        f"Monitoring {len(states)} symbols via Upstox WebSocket.\n"
+        f"No orders will be placed."
+    )
 
     configuration = upstox_client.Configuration()
     configuration.access_token = settings.UPSTOX_ACCESS_TOKEN
@@ -124,6 +129,7 @@ def run():
 
     def on_open():
         print(f"WebSocket connected; subscribed to {len(keys)} instruments.")
+        send("🟢 Upstox WebSocket connected. Live signal monitoring is active.")
 
     def on_error(message):
         print(f"WebSocket error: {message}")
@@ -165,8 +171,8 @@ def run():
     while datetime.now(IST) < start:
         time.sleep(5)
 
-    streamer.connect()
     try:
+        streamer.connect()
         while datetime.now(IST) < end:
             for instrument_key, future in list(pending.items()):
                 if not future.done():
@@ -216,6 +222,7 @@ def run():
             time.sleep(1)
     finally:
         pool.shutdown(wait=True, cancel_futures=True)
+        send("🔴 NSE LIVE SCANNER STOPPED for the session.")
         try:
             streamer.disconnect()
         except Exception:
