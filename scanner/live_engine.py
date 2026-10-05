@@ -19,7 +19,7 @@ def _completed(df):
     return current[current["timestamp"].dt.date < today].sort_values("timestamp").reset_index(drop=True)
 
 
-def build_state(symbol, df, nifty_df, market_cap_cr=None):
+def build_state(symbol, df, nifty_df):
     history = _completed(df)
     if history.empty:
         return None
@@ -53,7 +53,6 @@ def build_state(symbol, df, nifty_df, market_cap_cr=None):
         "prev_close": float(previous.close),
         "prev_high": float(previous.high),
         "pivot": float(previous.close) * (1 + settings.BREAKOUT_BUFFER_PCT / 100),
-        "market_cap_cr": market_cap_cr,
         "market_above_ema": market_above_ema,
         "orb_highs": {},
         "first30_volume": None,
@@ -160,7 +159,6 @@ def evaluate(state, quote):
     pocket = day_open > 0 and price > day_open and state["red_max_volume"] > 0 and volume > state["red_max_volume"]
     first30_surge = state["first30_volume"] is not None and state["first30_volume"] > state["avg_volume10"]
     orb_windows = [window for window, high in state["orb_highs"].items() if minutes >= window and price > high]
-    cap = state.get("market_cap_cr")
     breakout = price > min(state["prev_high"], state["prev_close"]) * (1 + settings.BREAKOUT_BUFFER_PCT / 100)
     checks = {
         "trend": state["history_days"] + 1 <= 21 or price > current_ema21,
@@ -172,7 +170,6 @@ def evaluate(state, quote):
         "near_high": from_high <= (15 if state["is_ipo"] else settings.MAX_FROM_52W_HIGH),
         "volatility": state["is_ipo"] or atr_pct > settings.MIN_ATR_PCT,
         "price_floor": price > settings.MIN_PRICE,
-        "market_cap": cap is not None and pd.notna(cap) and cap > 1000,
         "liquidity": liquidity_condition,
         "orb": bool(orb_windows),
     }
