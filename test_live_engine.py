@@ -17,7 +17,7 @@ class MomentumTests(unittest.TestCase):
             "open": 101.0, "high": 104.0, "low": 70.0,
             "close": 100.0, "volume": 1000000.0,
         })
-        self.state = live_engine.build_state("TEST", self.history, None, 2000)
+        self.state = live_engine.build_state("TEST", self.history, None)
         self.state["orb_highs"] = {3: 105.0}
         self.quote = {
             "last_price": 110.0, "volume": 4000000.0,
@@ -47,12 +47,6 @@ class MomentumTests(unittest.TestCase):
                 with self.subTest(window=window):
                     self.state["orb_highs"] = {window: 105.0}
                     self.assertTrue(live_engine.evaluate(self.state, self.quote)["buy"])
-
-    def test_missing_and_boundary_market_cap_block(self):
-        for cap in (None, float("nan"), 999, 1000):
-            with self.subTest(cap=cap):
-                self.state["market_cap_cr"] = cap
-                self.assertFalse(live_engine.evaluate(self.state, self.quote)["buy"])
 
     def test_pdc_breakout_does_not_require_pdh(self):
         self.state["prev_high"] = 120.0
@@ -93,7 +87,7 @@ class MomentumTests(unittest.TestCase):
         self.assertFalse(live_engine.evaluate(self.state, self.quote)["checks"]["volume_surge"])
 
     def test_ipo_exemptions_and_listing_high(self):
-        self.state = live_engine.build_state("IPO", self.history.iloc[:10], None, 2000)
+        self.state = live_engine.build_state("IPO", self.history.iloc[:10], None)
         self.state.update({"orb_highs": {3: 105}, "year_low": 100, "prior_tr13": 0, "ema21": 200})
         result = live_engine.evaluate(self.state, self.quote)
         self.assertTrue(result["buy"], result["checks"])
@@ -173,14 +167,6 @@ class MomentumTests(unittest.TestCase):
         self.assertIn("warning only", message)
         self.assertIn("NIFTYSMLCAP250", message)
 
-    def test_market_cap_currency_and_conversion(self):
-        with patch.object(live_data.yf, "Ticker") as ticker:
-            ticker.return_value.get_info.return_value = {"currency": "INR", "marketCap": 2000e7}
-            self.assertEqual(live_data.market_cap_cr("TEST"), 2000)
-            ticker.return_value.get_info.return_value = {"currency": "USD", "marketCap": 2000e7}
-            with self.assertRaises(ValueError):
-                live_data.market_cap_cr("TEST")
-
     def test_intraday_api_endpoint_and_candle_parsing(self):
         with patch.object(live_data, "_request_json", return_value={"data": {"candles": [
                 ["2026-10-02T09:15:00+05:30", 100, 105, 99, 101, 200, 0]]}}) as request:
@@ -227,7 +213,6 @@ class MomentumTests(unittest.TestCase):
               patch.object(live_monitor, "load_nse_equities", return_value=universe),
               patch.object(live_monitor, "find_smallcap250_key", side_effect=RuntimeError("unavailable")),
               patch.object(live_monitor, "historical_many", return_value={"NSE_EQ|TEST": ("TEST", self.history, None)}),
-              patch.object(live_monitor, "market_cap_cr", return_value=2000) as cap,
               patch.object(live_monitor, "intraday_minutes", return_value=candles) as intraday,
               patch.object(live_monitor.upstox_client, "MarketDataStreamerV3") as streamer,
               patch.object(live_monitor, "send") as send):
@@ -237,7 +222,6 @@ class MomentumTests(unittest.TestCase):
             live_monitor.run()
             send.assert_called_once()
             self.assertIn("MOMENTUM BUY - TEST", send.call_args.args[0])
-            cap.assert_called_once_with("TEST")
             intraday.assert_called_once_with("NSE_EQ|TEST")
             streamer.return_value.disconnect.assert_called_once()
 
