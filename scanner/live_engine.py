@@ -57,6 +57,10 @@ def build_state(symbol, df, nifty_df, market_cap_cr=None):
         "market_above_ema": market_above_ema,
         "orb_highs": {},
         "first30_volume": None,
+        # RVOL baseline inputs matching the PineScript calculation.
+        "rvol_traded_days": len(history),
+        "rvol_cum_volume": float(history.volume.sum()),
+        "rvol_prev19_volume": float(history.volume.iloc[-19:].sum()),
     }
 
 
@@ -108,8 +112,23 @@ def evaluate(state, quote):
     year_low = min(state["year_low"], day_low)
     from_high = (year_high - price) / year_high * 100
     swing = (price / year_low - 1) * 100
-    elapsed_fraction = min(max(minutes / 375, 1 / 375), 1)
-    rvol = volume / (state["avg_volume"] * elapsed_fraction) if state["avg_volume"] > 0 else 0
+
+    # PineScript RVOL logic:
+    # avgVol20 = tradedDays < inp_rvLen ?
+    #     (ta.cum(volume) / math.max(1, tradedDays)) :
+    #     ta.sma(volume, inp_rvLen)
+    # relVol = volume / avgVol20
+    # cond_RVOL = relVol > inp_rvThresh
+    #
+    # inp_rvLen = 20. The current developing daily volume is included.
+    traded_days = state["rvol_traded_days"] + 1
+    if traded_days < 20:
+        avg_vol20 = (state["rvol_cum_volume"] + volume) / max(1, traded_days)
+    else:
+        avg_vol20 = (state["rvol_prev19_volume"] + volume) / 20.0
+    rvol = volume / avg_vol20 if avg_vol20 > 0 else 0.0
+    rvol_condition = rvol > settings.MIN_RVOL
+
     pocket = day_open > 0 and price > day_open and state["red_max_volume"] > 0 and volume > state["red_max_volume"]
     first30_surge = state["first30_volume"] is not None and state["first30_volume"] > state["avg_volume10"]
     orb_windows = [window for window, high in state["orb_highs"].items() if minutes >= window and price > high]
@@ -118,7 +137,7 @@ def evaluate(state, quote):
     checks = {
         "trend": state["history_days"] + 1 <= 21 or price > current_ema21,
         "extension": not getattr(settings, "LIVE_BLOCK_EXTENDED", False) or (extension10 <= 10 and extension21 <= 20),
-        "volume_surge": rvol > settings.MIN_RVOL or pocket or first30_surge,
+        "volume_surge": rvol_condition or pocket or first30_surge,
         "momentum": price > state["prev_close"],
         "breakout": breakout,
         "strength": state["is_ipo"] or swing >= settings.MIN_SWING_RETURN,
@@ -135,6 +154,7 @@ def evaluate(state, quote):
         "volume": volume,
         "avg_turnover10_cr": state["avg_turnover10_cr"],
         "rvol": rvol,
+        "rvol_condition": rvol_condition,
         "atr_pct": atr_pct,
         "from_high": from_high,
         "swing": swing,
