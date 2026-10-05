@@ -61,6 +61,12 @@ def build_state(symbol, df, nifty_df, market_cap_cr=None):
         "rvol_traded_days": len(history),
         "rvol_cum_volume": float(history.volume.sum()),
         "rvol_prev19_volume": float(history.volume.iloc[-19:].sum()),
+        # Turnover baseline inputs matching the PineScript calculation.
+        "turnover_traded_days": len(history),
+        "turnover_cum_volume": float(history.volume.sum()),
+        "turnover_cum_close": float(history.close.sum()),
+        "turnover_prev49_volume": float(history.volume.iloc[-49:].sum()),
+        "turnover_prev49_close": float(history.close.iloc[-49:].sum()),
     }
 
 
@@ -129,6 +135,28 @@ def evaluate(state, quote):
     rvol = volume / avg_vol20 if avg_vol20 > 0 else 0.0
     rvol_condition = rvol > settings.MIN_RVOL
 
+    # PineScript turnover/liquidity logic:
+    # if tradedDays < 50:
+    #     avgVol50 = ta.cum(volume) / tradedDays
+    #     avgPrice50 = ta.cum(close) / tradedDays
+    # else:
+    #     avgVol50 = ta.sma(volume, 50)
+    #     avgPrice50 = ta.sma(close, 50)
+    # turnover = avgPrice50 * avgVol50
+    # cond12_Liquidity = turnover > inp_minTurnoverRaw
+    #
+    # The current developing daily volume and close are included.
+    turnover_traded_days = state["turnover_traded_days"] + 1
+    if turnover_traded_days < 50:
+        avg_vol50 = (state["turnover_cum_volume"] + volume) / max(1, turnover_traded_days)
+        avg_price50 = (state["turnover_cum_close"] + price) / max(1, turnover_traded_days)
+    else:
+        avg_vol50 = (state["turnover_prev49_volume"] + volume) / 50.0
+        avg_price50 = (state["turnover_prev49_close"] + price) / 50.0
+    turnover_raw = avg_price50 * avg_vol50
+    turnover_cr = turnover_raw / 1e7
+    liquidity_condition = turnover_cr > settings.MIN_TURNOVER_CR
+
     pocket = day_open > 0 and price > day_open and state["red_max_volume"] > 0 and volume > state["red_max_volume"]
     first30_surge = state["first30_volume"] is not None and state["first30_volume"] > state["avg_volume10"]
     orb_windows = [window for window, high in state["orb_highs"].items() if minutes >= window and price > high]
@@ -145,7 +173,7 @@ def evaluate(state, quote):
         "volatility": state["is_ipo"] or atr_pct > settings.MIN_ATR_PCT,
         "price_floor": price > settings.MIN_PRICE,
         "market_cap": cap is not None and pd.notna(cap) and cap > 1000,
-        "liquidity": state["avg_turnover10_cr"] >= settings.MIN_TURNOVER_CR,
+        "liquidity": liquidity_condition,
         "orb": bool(orb_windows),
     }
     return {
@@ -153,6 +181,8 @@ def evaluate(state, quote):
         "price": price,
         "volume": volume,
         "avg_turnover10_cr": state["avg_turnover10_cr"],
+        "turnover_raw": turnover_raw,
+        "turnover_cr": turnover_cr,
         "rvol": rvol,
         "rvol_condition": rvol_condition,
         "atr_pct": atr_pct,
