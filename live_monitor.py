@@ -11,7 +11,7 @@ from google.protobuf.json_format import MessageToDict
 from config import settings
 from scanner.alerts import send
 from scanner.live_engine import build_state, evaluate, update_intraday, _completed
-from scanner.live_data import find_smallcap250_key, intraday_minutes, market_cap_cr
+from scanner.live_data import find_smallcap250_key, intraday_minutes
 from scanner.indicators import ema
 from scanner.upstox import load_nse_equities, historical_daily, historical_many
 
@@ -55,7 +55,7 @@ def fmt_alert(kind, r):
         f"Price Rs {r['price']:.2f} | PDC buffer Rs {r['pivot']:.2f}\n"
         f"RVOL {r['rvol']:.2f}x | ATR {r['atr_pct']:.2f}% | IPO {r['is_ipo']}\n"
         f"From high {r['from_high']:.2f}% | Rally {r['swing']:.1f}%\n"
-        f"Market cap Rs {r['market_cap_cr']:.0f} Cr | Turnover Rs {r['price'] * r['volume'] / 1e7:.1f} Cr\n"
+        f"Turnover Rs {r['price'] * r['volume'] / 1e7:.1f} Cr\n"
         f"ORB break: {ranges} | Pocket pivot {r['pocket_pivot']} | First 30m surge {r['first30_surge']}\n"
         f"Extension EMA10 {r['extension10']:.1f}% / EMA21 {r['extension21']:.1f}%\n"
         f"Prior volume dry-up: {'yes' if r['dry_up'] else 'no (warning only)'}\n"
@@ -122,7 +122,6 @@ def run():
     quote_lock = Lock()
     pending = {}
     next_refresh = {}
-    cap_checked = set()
     pool = ThreadPoolExecutor(max_workers=settings.UPSTOX_MAX_WORKERS)
     market_context = {"above_ema": None}
     last_log = 0.0
@@ -153,14 +152,8 @@ def run():
             except Exception as exc:
                 print(f"[{instrument_key}] tick processing failed: {exc}")
 
-    def fetch_signal_data(instrument_key, symbol, fetch_cap):
-        cap = None
-        if fetch_cap:
-            try:
-                cap = market_cap_cr(symbol)
-            except Exception as exc:
-                print(f"[{symbol}] market cap unavailable; BUY blocked: {exc}")
-        return cap, intraday_minutes(instrument_key)
+    def fetch_signal_data(instrument_key):
+        return intraday_minutes(instrument_key)
 
     streamer.on("open", on_open)
     streamer.on("message", on_message)
@@ -180,13 +173,7 @@ def run():
                 del pending[instrument_key]
                 state = states[instrument_key]
                 try:
-                    cap, candles = future.result()
-                    if instrument_key not in cap_checked:
-                        state["market_cap_cr"] = cap
-                        if cap is not None:
-                            cap_checked.add(instrument_key)
-                        else:
-                            next_refresh[instrument_key] = time.monotonic() + 300
+                    candles = future.result()
                     update_intraday(state, candles)
                 except Exception as exc:
                     print(f"[{state['symbol']}] opening candle refresh failed; BUY blocked until ORB known: {exc}")
@@ -207,13 +194,11 @@ def run():
                     send(fmt_alert("BUY", result))
                     continue
                 eligible = all(passed for name, passed in result["checks"].items()
-                               if name not in {"orb", "volume_surge", "market_cap"})
-                known_small_cap = instrument_key in cap_checked and not result["checks"]["market_cap"]
-                needs_data = len(state["orb_highs"]) < 5 or instrument_key not in cap_checked
-                if (eligible and not known_small_cap and needs_data and
-                        instrument_key not in pending and time.monotonic() >= next_refresh.get(instrument_key, 0)):
-                    pending[instrument_key] = pool.submit(fetch_signal_data, instrument_key, state["symbol"],
-                                                          instrument_key not in cap_checked)
+                               if name not in {"orb", "volume_surge"})
+                needs_data = len(state["orb_highs"]) < 5
+                if (eligible and needs_data and instrument_key not in pending and
+                        time.monotonic() >= next_refresh.get(instrument_key, 0)):
+                    pending[instrument_key] = pool.submit(fetch_signal_data, instrument_key)
                     next_refresh[instrument_key] = time.monotonic() + 60
             now = time.time()
             if now - last_log >= 60:
