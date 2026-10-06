@@ -1,4 +1,6 @@
 import time
+import csv
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, time as dtime
 from threading import Lock
@@ -70,6 +72,9 @@ def market_open_close():
     return start, end
 
 def run():
+    alert_log = Path("live_alerts.csv")
+    with alert_log.open("w", newline="", encoding="utf-8") as f:
+        csv.writer(f).writerow(["alert_date", "alert_time_ist", "symbol", "alert_price"])
     universe = load_nse_equities()
     nifty_key = None
     nifty_df = pd.DataFrame()
@@ -191,6 +196,13 @@ def run():
                     continue
                 if result["buy"]:
                     sent_buy.add(alert_key)
+                    with alert_log.open("a", newline="", encoding="utf-8") as f:
+                        csv.writer(f).writerow([
+                            datetime.now(IST).date().isoformat(),
+                            datetime.now(IST).isoformat(),
+                            result["symbol"],
+                            f'{result["price"]:.2f}',
+                        ])
                     send(fmt_alert("BUY", result))
                     continue
                 eligible = all(passed for name, passed in result["checks"].items()
