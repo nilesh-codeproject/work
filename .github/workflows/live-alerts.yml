@@ -30,6 +30,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
       - name: Save today's BUY alert log
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: live-alerts
