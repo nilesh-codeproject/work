@@ -1,5 +1,6 @@
 import csv
-from datetime import date
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 from scanner.alerts import send
@@ -11,7 +12,7 @@ def run():
         send("📊 LIVE ALERT PERFORMANCE\nNo live BUY alert log was found for today.")
         return
 
-    today = date.today().isoformat()
+    today = datetime.now(ZoneInfo("Asia/Kolkata")).date().isoformat()
     alerts = []
     with alert_file.open(newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
