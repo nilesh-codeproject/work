@@ -7,7 +7,7 @@ import requests
 INDEX_URLS = {
     "NIFTY500": "https://www.niftyindices.com/IndexConstituent/ind_nifty500list.csv",
     "MIDSMALLCAP400": "https://www.niftyindices.com/IndexConstituent/ind_niftymidsmallcap400list.csv",
-    "MICROCAP250": "https://www.niftyindices.com/IndexConstituent/ind_niftymicrocap250list.csv",
+    "MICROCAP250": "https://www.niftyindices.com/IndexConstituent/ind_niftymicrocap250_list.csv",
     "SMALLCAP250": "https://www.niftyindices.com/IndexConstituent/ind_niftysmallcap250list.csv",
 }
 IPO_START = date(2026, 1, 1)
@@ -35,12 +35,12 @@ def _index_symbols(url):
 def _ipo_symbols():
     # NSE's public IPO tracker endpoint. We use listed-on date and keep
     # every NSE equity IPO from 2026-01-01 onward.
-    url = "https://www.nseindia.com/api/ipo-tracker?type=ipo_year"
+    url = "https://www.nseindia.com/api/ipo-tracker?type=gain_issue_price"
     session = requests.Session()
     session.headers.update({
         "User-Agent": _headers()["User-Agent"],
         "Accept": "application/json,text/plain,*/*",
-        "Referer": "https://www.nseindia.com/ipo-tracker?type=ipo_year",
+        "Referer": "https://www.nseindia.com/ipo-tracker?type=gain_issue_price",
         "Accept-Language": "en-US,en;q=0.9",
     })
     session.get("https://www.nseindia.com/", timeout=20)
