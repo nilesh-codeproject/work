@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 from pathlib import Path
 
 from scanner.alerts import send
-from scanner.upstox import load_nse_equities, historical_daily
+from scanner.upstox import load_nse_equities, current_day_daily
 
 def run():
     alert_file = Path("live_alerts.csv")
@@ -36,7 +36,7 @@ def run():
             continue
 
         try:
-            df = historical_daily(key, years=1)
+            df = current_day_daily(key)
             if df.empty:
                 rows.append((symbol, alert_price, None, None, "NO DATA"))
                 continue
