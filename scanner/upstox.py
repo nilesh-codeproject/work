@@ -103,6 +103,20 @@ def historical_daily(key,years=2):
         df[col]=pd.to_numeric(df[col],errors='coerce')
     return df.sort_values('timestamp').reset_index(drop=True)
 
+def current_day_daily(key):
+    # Upstox V3 intraday endpoint returns the current trading day's
+    # day-level OHLC candle. Use this for today's performance lookup.
+    url=f'{BASE}/v3/historical-candle/intraday/{key}/days/1'
+    payload=_request_json(url)
+    candles=payload.get('data',{}).get('candles',[])
+    if not candles:
+        return pd.DataFrame()
+    df=pd.DataFrame(candles,columns=['timestamp','open','high','low','close','volume','oi'])
+    df['timestamp']=pd.to_datetime(df['timestamp'])
+    for col in ['open','high','low','close','volume']:
+        df[col]=pd.to_numeric(df[col],errors='coerce')
+    return df.sort_values('timestamp').reset_index(drop=True)
+
 def full_market_quotes(instrument_keys):
     if not instrument_keys:
         return {}

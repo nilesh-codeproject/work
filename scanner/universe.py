@@ -33,34 +33,93 @@ def _index_symbols(url):
     }
 
 def _ipo_symbols():
-    # NSE's public IPO tracker endpoint. We use listed-on date and keep
-    # every NSE equity IPO from 2026-01-01 onward.
-    url = "https://www.nseindia.com/api/ipo-tracker?type=gain_issue_price"
-    session = requests.Session()
-    session.headers.update({
-        "User-Agent": _headers()["User-Agent"],
-        "Accept": "application/json,text/plain,*/*",
-        "Referer": "https://www.nseindia.com/ipo-tracker?type=gain_issue_price",
-        "Accept-Language": "en-US,en;q=0.9",
-    })
-    session.get("https://www.nseindia.com/", timeout=20)
-    r = session.get(url, timeout=30)
-    r.raise_for_status()
-    payload = r.json()
-    records = payload.get("data", payload if isinstance(payload, list) else [])
-    symbols = set()
+    """
+    Fetch listed IPOs from Upstox's supported IPO API.
 
-    for item in records:
-        symbol = str(item.get("symbol") or item.get("SYMBOL") or "").strip().upper()
-        listed = str(
-            item.get("listedOn") or item.get("listed_on") or
-            item.get("LISTED ON") or item.get("listingDate") or ""
-        ).strip()
-        if not symbol or not listed:
-            continue
-        parsed = pd.to_datetime(listed, errors="coerce", dayfirst=True)
-        if pd.notna(parsed) and parsed.date() >= IPO_START:
-            symbols.add(symbol)
+    We page through all listed IPOs, keep IPOs whose bidding started on/after
+    IPO_START, and later let load_nse_equities() restrict them to NSE_EQ
+    instruments. This replaces the unreliable NSE public IPO-tracker URL.
+    """
+    import os
+    import time
+
+    token = os.getenv("UPSTOX_ACCESS_TOKEN", "")
+    if not token:
+        raise RuntimeError("UPSTOX_ACCESS_TOKEN is not configured.")
+
+    url = "https://api.upstox.com/v2/ipos"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+    }
+
+    symbols = set()
+    page = 1
+    records = 30
+
+    while True:
+        payload = None
+        last_error = None
+
+        for attempt in range(3):
+            try:
+                response = requests.get(
+                    url,
+                    params={
+                        "status": "listed",
+                        "page_number": page,
+                        "records": records,
+                    },
+                    headers=headers,
+                    timeout=20,
+                )
+
+                if response.status_code in {429, 500, 502, 503, 504}:
+                    last_error = RuntimeError(
+                        f"HTTP {response.status_code}"
+                    )
+                    if attempt < 2:
+                        time.sleep(2 * (attempt + 1))
+                        continue
+
+                response.raise_for_status()
+                payload = response.json()
+                break
+
+            except requests.RequestException as exc:
+                last_error = exc
+                if attempt < 2:
+                    time.sleep(2 * (attempt + 1))
+
+        if payload is None:
+            raise RuntimeError(
+                f"Upstox IPO API failed on page {page}: {last_error}"
+            )
+
+        page_data = payload.get("data", [])
+        if not page_data:
+            break
+
+        for item in page_data:
+            symbol = str(item.get("symbol") or "").strip().upper()
+            bidding_start = str(
+                item.get("bidding_start_date") or ""
+            ).strip()
+
+            if not symbol or not bidding_start:
+                continue
+
+            parsed = pd.to_datetime(bidding_start, errors="coerce")
+            if pd.notna(parsed) and parsed.date() >= IPO_START:
+                symbols.add(symbol)
+
+        page_info = payload.get("meta_data", {}).get("page", {})
+        total_pages = int(page_info.get("total_pages") or page)
+
+        if page >= total_pages:
+            break
+
+        page += 1
 
     return symbols
 

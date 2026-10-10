@@ -79,12 +79,28 @@ def update_intraday(state, candles, now=None):
     bars = bars[(bars.timestamp >= start) & (bars.timestamp + pd.Timedelta(minutes=1) <= now)]
     bars = bars.drop_duplicates("timestamp").sort_values("timestamp")
     for window in ORB_WINDOWS:
-        opening = bars[bars.timestamp < start + pd.Timedelta(minutes=window)]
-        expected = pd.date_range(start, periods=window, freq="min")
-        if len(opening) == window and opening.timestamp.tolist() == expected.tolist():
-            state["orb_highs"][window] = float(opening.high.max())
-            if window == 30:
-                state["first30_volume"] = float(opening.volume.sum())
+        # Build each ORB from the opening time range itself. A missing or
+        # delayed 1-minute candle must not invalidate the entire ORB.
+        #
+        # 3m  -> 09:15 through 09:17
+        # 5m  -> 09:15 through 09:19
+        # 15m -> 09:15 through 09:29
+        # 30m -> 09:15 through 09:44
+        # 60m -> 09:15 through 10:14
+        window_end = start + pd.Timedelta(minutes=window)
+        if now < window_end:
+            continue
+
+        opening = bars[
+            (bars.timestamp >= start) &
+            (bars.timestamp < window_end)
+        ]
+        if opening.empty:
+            continue
+
+        state["orb_highs"][window] = float(opening.high.max())
+        if window == 30:
+            state["first30_volume"] = float(opening.volume.sum())
 
 
 def _market_minutes():
