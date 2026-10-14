@@ -203,7 +203,7 @@ def run():
                             result["symbol"],
                             f'{result["price"]:.2f}',
                         ])
-                    send(fmt_alert("BUY", result))
+                    send(fmt_alert("BUY", result), chart_symbol=result["symbol"])
                     continue
                 eligible = all(passed for name, passed in result["checks"].items()
                                if name not in {"orb", "volume_surge"})
