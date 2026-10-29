@@ -148,7 +148,7 @@ def run():
 
     now = datetime.now(ET)
     market_open = datetime.combine(now.date(), dt_time(9, 30), tzinfo=ET)
-    market_close = datetime.combine(now.date(), dt_time(16, 0), tzinfo=ET)
+    market_close = datetime.combine(now.date(), dt_time(15, 25), tzinfo=ET)
     startup_window_start = market_open - pd.Timedelta(minutes=15)
     startup_window_end = market_open + pd.Timedelta(minutes=15)
     if now < startup_window_start or now > startup_window_end:
