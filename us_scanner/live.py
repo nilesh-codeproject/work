@@ -147,8 +147,13 @@ def run():
     now = datetime.now(ET)
     market_open = datetime.combine(now.date(), dt_time(9, 30), tzinfo=ET)
     market_close = datetime.combine(now.date(), dt_time(16, 0), tzinfo=ET)
-    while datetime.now(ET) < market_open:
-        time.sleep(30)
+    startup_window_start = market_open - pd.Timedelta(minutes=15)
+    startup_window_end = market_open + pd.Timedelta(minutes=15)
+    if now < startup_window_start or now > startup_window_end:
+        print(
+            f"US live workflow started outside the market-open window: {now.isoformat()}"
+        )
+        return
 
     ws = websocket.WebSocketApp(
         STREAM_URL,
@@ -158,6 +163,7 @@ def run():
         on_close=on_close,
     )
     ws.run_forever(ping_interval=20, ping_timeout=10)
+
 
 if __name__ == "__main__":
     run()
