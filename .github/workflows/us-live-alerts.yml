@@ -1,0 +1,41 @@
+name: US Free Live Alerts
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r requirements-us.txt
+      - name: Download latest pre-market candidate list
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          RUN_ID=$(gh run list --workflow us-premarket.yml --branch "$BRANCH_NAME" --limit 10 --json databaseId,status,conclusion,createdAt -q '[.[] | select(.status == "completed" and .conclusion == "success")][0].databaseId')
+          if [ -z "$RUN_ID" ]; then
+            echo "No successful US pre-market run found on branch $BRANCH_NAME."
+            exit 1
+          fi
+          echo "Using pre-market run: $RUN_ID"
+          gh run download "$RUN_ID" --name us-candidates --dir us_premarket_input
+          find us_premarket_input -name us_candidates.csv -exec cp {} ./us_candidates.csv \;
+          test -f us_candidates.csv
+      - name: Run US live scanner
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_API_SECRET: ${{ secrets.ALPACA_API_SECRET }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python -u us_scanner/live.py
