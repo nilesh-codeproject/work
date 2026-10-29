@@ -13,7 +13,7 @@ def send(message, chart_symbol=None):
         symbol = str(chart_symbol).strip().upper()
         payload["reply_markup"] = {"inline_keyboard": [[{
             "text": "📈 Chart",
-            "url": "https://www.tradingview.com/chart/?symbol=" + quote(f"NASDAQ:{symbol}", safe="")
+            "url": "https://www.tradingview.com/chart/?symbol=" + quote(symbol, safe="")
         }]]}
     for chat_id in chat_ids:
         try:
