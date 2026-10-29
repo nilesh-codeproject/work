@@ -67,7 +67,8 @@ def _evaluate(state, bar):
     )
 
     previous_close = state["previous_close"]
-    breakout_level = previous_close * (1 + BREAKOUT_BUFFER_PCT / 100.0)
+    previous_high = state["previous_high"]
+    breakout_level = min(previous_high, previous_close) * (1 + BREAKOUT_BUFFER_PCT / 100.0)
     breakout = price > breakout_level
     momentum = price > previous_close
 
@@ -88,6 +89,7 @@ def run():
     state = {
         row.symbol: {
             "previous_close": float(row.previous_close),
+            "previous_high": float(row.previous_high),
             "avg_volume20": float(row.avg_volume20),
             "bars": [],
             "cumulative_volume": 0.0,
