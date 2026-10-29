@@ -1,0 +1,35 @@
+name: US Free Pre-Market Scanner
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  premarket:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout US scanner branch
+        uses: actions/checkout@v4
+        with:
+          ref: Nilesh_US_Free_Scanner
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r requirements-us.txt
+      - name: Build US candidate list
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_API_SECRET: ${{ secrets.ALPACA_API_SECRET }}
+        run: python -u us_scanner/premarket.py
+      - name: Upload US candidates
+        uses: actions/upload-artifact@v4
+        with:
+          name: us-candidates
+          path: us_candidates.csv
+          if-no-files-found: error
+          retention-days: 2
