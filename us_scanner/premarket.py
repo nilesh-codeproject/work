@@ -84,6 +84,7 @@ def score_symbol(frame):
         "rvol_daily": rvol_daily,
         "atr_pct": atr_pct,
         "avg_dollar_volume20": avg_dollar_volume20,
+        "avg_volume20": avg_volume20,
         "checks_passed": score,
     }
 
