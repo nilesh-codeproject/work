@@ -25,7 +25,7 @@ jobs:
         env:
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_API_SECRET: ${{ secrets.ALPACA_API_SECRET }}
-        run: python -u us_scanner/premarket.py
+        run: python -m us_scanner.premarket
       - name: Upload US candidates
         uses: actions/upload-artifact@v4
         with:
